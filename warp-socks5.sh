@@ -78,8 +78,6 @@ echo "PORT: $SOCKS_PORT"
 echo ""
 echo "测试Warp是否连接上:"
 echo "curl --socks5-hostname 127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep warp"
-curl --socks5-hostname 127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep warp
 echo "测试Warp的IP:"
 echo "curl --socks5-hostname 127.0.0.1:$SOCKS_PORT ip.sb"
-curl --socks5-hostname 127.0.0.1:$SOCKS_PORT ip.sb
 
