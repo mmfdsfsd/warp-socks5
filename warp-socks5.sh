@@ -57,11 +57,15 @@ Description=Wireproxy WARP Proxy
 After=network.target
 
 [Service]
-MemoryLimit=300M
 Type=simple
+MemoryLimit=300M
+MemorySwapLimit=300M
+Environment=GOGC=50
 WorkingDirectory=$WORKDIR
 ExecStart=/usr/local/bin/wireproxy -c $WORKDIR/wireproxy.conf
 Restart=always
+RestartSec=5s
+StartLimitInterval=0
 
 [Install]
 WantedBy=multi-user.target
