@@ -59,8 +59,8 @@ After=network.target
 [Service]
 Type=simple
 MemoryLimit=300M
-MemorySwapLimit=300M
-Environment=GOGC=50
+MemorySwapLimit=600M
+Environment=GOGC=30
 WorkingDirectory=$WORKDIR
 ExecStart=/usr/local/bin/wireproxy -c $WORKDIR/wireproxy.conf
 Restart=always
