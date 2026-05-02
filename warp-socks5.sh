@@ -11,8 +11,8 @@ mkdir -p $WORKDIR
 cd $WORKDIR
 
 echo "安装依赖..."
-apt update
-apt install -y curl wget sudo tar
+yum update
+yum install -y curl wget sudo tar
 
 echo "下载 wgcf..."
 wget -O wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.30/wgcf_2.2.30_linux_amd64
