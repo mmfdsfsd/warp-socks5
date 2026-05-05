@@ -21,11 +21,11 @@ fi
 # 统一非交互模式（避免卡死）
 export DEBIAN_FRONTEND=noninteractive
 if [[ "$OS_ID" =~ ^(centos|rhel|almalinux|rocky)$ ]]; then
-    echo "检测到 RHEL 系系统: $OS_ID"
+    echo "检测到 RHEL 系-系统: $OS_ID"
     PKG_UPDATE="yum -y update"
     PKG_INSTALL="yum -y install"
 elif [[ "$OS_ID" =~ ^(debian|ubuntu)$ ]]; then
-    echo "检测到 Debian 系系统: $OS_ID"
+    echo "检测到 Debian 系-系统: $OS_ID"
     PKG_UPDATE="apt update -y"
     PKG_INSTALL="apt install -y"
 else
