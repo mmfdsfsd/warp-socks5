@@ -2,111 +2,323 @@
 
 set -e
 
-echo "===== WARP + wireproxy 自动安装 ====="
+WORKDIR="/opt/warp"
+SERVICE_NAME="wireproxy"
 
-WORKDIR=/opt/warp
-SOCKS_PORT=40000
+green() {
+    echo -e "\033[32m$1\033[0m"
+}
 
-mkdir -p $WORKDIR
-cd $WORKDIR
+red() {
+    echo -e "\033[31m$1\033[0m"
+}
 
-echo "安装依赖..."
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS_ID=$ID
-else
-    echo "无法识别系统类型"
-    exit 1
-fi
-# 统一非交互模式（避免卡死）
-export DEBIAN_FRONTEND=noninteractive
-if [[ "$OS_ID" =~ ^(centos|rhel|almalinux|rocky)$ ]]; then
-    echo "检测到 RHEL 系-系统: $OS_ID"
-    PKG_UPDATE="yum -y update"
-    PKG_INSTALL="yum -y install"
-elif [[ "$OS_ID" =~ ^(debian|ubuntu)$ ]]; then
-    echo "检测到 Debian 系-系统: $OS_ID"
-    PKG_UPDATE="apt update -y"
-    PKG_INSTALL="apt install -y"
-else
-    echo "不支持的系统: $OS_ID"
-    exit 1
-fi
-# 执行
-eval "$PKG_UPDATE"
-eval "$PKG_INSTALL curl wget sudo tar"
+yellow() {
+    echo -e "\033[33m$1\033[0m"
+}
 
-echo "下载 wgcf..."
-wget -O wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.30/wgcf_2.2.30_linux_amd64
-chmod +x wgcf
+check_root() {
+    if [ "$(id -u)" != "0" ]; then
+        red "请使用 root 权限运行"
+        exit 1
+    fi
+}
 
-echo "注册 WARP..."
-yes | ./wgcf register
+detect_os() {
 
-echo "生成 WireGuard 配置..."
-./wgcf generate
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS_ID=$ID
+    else
+        red "无法识别系统"
+        exit 1
+    fi
 
-echo "下载 wireproxy..."
-wget https://github.com/windtf/wireproxy/releases/download/v1.1.2/wireproxy_linux_amd64.tar.gz
-tar -zxvf wireproxy_linux_amd64.tar.gz
-chmod +x wireproxy
-mv wireproxy /usr/local/bin/
+    export DEBIAN_FRONTEND=noninteractive
 
-PRIVATE_KEY=$(grep PrivateKey wgcf-profile.conf | awk '{print $3}')
-PUBLIC_KEY=$(grep PublicKey wgcf-profile.conf | awk '{print $3}')
-ADDRESS=$(grep Address wgcf-profile.conf | awk '{print $3}')
+    if [[ "$OS_ID" =~ ^(centos|rhel|almalinux|rocky)$ ]]; then
+        OS_FAMILY="rhel"
+    elif [[ "$OS_ID" =~ ^(debian|ubuntu)$ ]]; then
+        OS_FAMILY="debian"
+    else
+        red "不支持的系统: $OS_ID"
+        exit 1
+    fi
+}
 
-echo "生成 wireproxy 配置..."
-cat > wireproxy.conf <<EOF
-[Interface]
-PrivateKey = $PRIVATE_KEY
-Address = $ADDRESS
-DNS = 1.1.1.1
+install_deps() {
 
-[Peer]
-PublicKey = $PUBLIC_KEY
-Endpoint = engage.cloudflareclient.com:2408
-AllowedIPs = 0.0.0.0/0
+    green "安装依赖..."
+
+    if [[ "$OS_FAMILY" == "rhel" ]]; then
+
+        yum -y update
+        yum -y install curl wget tar sudo
+
+    else
+
+        apt update -y
+        apt install -y curl wget tar sudo
+
+    fi
+}
+
+open_firewall() {
+
+    green "开放防火墙端口..."
+
+    if [[ "$OS_FAMILY" == "rhel" ]]; then
+
+        if command -v firewall-cmd >/dev/null 2>&1; then
+            firewall-cmd --permanent --add-port=${SOCKS_PORT}/tcp || true
+            firewall-cmd --reload || true
+        fi
+
+    else
+
+        if command -v ufw >/dev/null 2>&1; then
+            ufw allow ${SOCKS_PORT}/tcp || true
+        fi
+
+    fi
+}
+
+close_firewall() {
+
+    yellow "关闭防火墙端口..."
+
+    if [[ "$OS_FAMILY" == "rhel" ]]; then
+
+        if command -v firewall-cmd >/dev/null 2>&1; then
+            firewall-cmd --permanent --remove-port=${SOCKS_PORT}/tcp || true
+            firewall-cmd --reload || true
+        fi
+
+    else
+
+        if command -v ufw >/dev/null 2>&1; then
+            ufw delete allow ${SOCKS_PORT}/tcp || true
+        fi
+
+    fi
+}
+
+install_warp() {
+
+    clear
+
+    green "===== 安装 WARP + wireproxy ====="
+    echo ""
+
+    read -p "请输入 SOCKS5 端口 [默认:40000]: " SOCKS_PORT
+    SOCKS_PORT=${SOCKS_PORT:-40000}
+
+    echo ""
+
+    read -p "请输入 SOCKS5 用户名 [默认:admin]: " SOCKS_USER
+    SOCKS_USER=${SOCKS_USER:-admin}
+
+    echo ""
+
+    read -p "请输入 SOCKS5 密码 [默认:123456]: " SOCKS_PASS
+    SOCKS_PASS=${SOCKS_PASS:-123456}
+
+    echo ""
+
+    green "配置如下:"
+    echo "端口: $SOCKS_PORT"
+    echo "用户名: $SOCKS_USER"
+    echo "密码: $SOCKS_PASS"
+
+    echo ""
+
+    read -p "确认安装？[y/n]: " CONFIRM
+
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        red "已取消"
+        exit 0
+    fi
+
+    mkdir -p $WORKDIR
+
+    cd $WORKDIR
+
+    install_deps
+
+    green "下载 wgcf..."
+
+    wget -O wgcf \
+    https://github.com/ViRb3/wgcf/releases/download/v2.2.30/wgcf_2.2.30_linux_amd64
+
+    chmod +x wgcf
+
+    green "注册 WARP..."
+
+    yes | ./wgcf register
+
+    green "生成配置..."
+
+    ./wgcf generate
+
+    green "下载 wireproxy..."
+
+    wget -O wireproxy.tar.gz \
+    https://github.com/windtf/wireproxy/releases/download/v1.1.2/wireproxy_linux_amd64.tar.gz
+
+    tar -zxvf wireproxy.tar.gz
+
+    chmod +x wireproxy
+
+    mv -f wireproxy /usr/local/bin/
+
+    green "追加 SOCKS5 配置..."
+
+    cat >> wgcf-profile.conf <<EOF
 
 [Socks5]
-BindAddress = 127.0.0.1:$SOCKS_PORT
+BindAddress = 0.0.0.0:${SOCKS_PORT}
+Username = ${SOCKS_USER}
+Password = ${SOCKS_PASS}
 EOF
 
-echo "创建 systemd 服务..."
-cat > /etc/systemd/system/wireproxy.service <<EOF
+    green "创建 systemd 服务..."
+
+    cat > /etc/systemd/system/${SERVICE_NAME}.service <<EOF
 [Unit]
 Description=Wireproxy WARP Proxy
 After=network.target
 
 [Service]
 Type=simple
-MemoryLimit=300M
-MemorySwapLimit=600M
-Environment=GOGC=30
-WorkingDirectory=$WORKDIR
-ExecStart=/usr/local/bin/wireproxy -c $WORKDIR/wireproxy.conf
+
+WorkingDirectory=${WORKDIR}
+
+ExecStart=/usr/local/bin/wireproxy -c ${WORKDIR}/wgcf-profile.conf
+
 Restart=always
-RestartSec=5s
-StartLimitInterval=0
+RestartSec=5
+
+Environment=GOGC=30
+MemoryLimit=300M
+LimitNOFILE=1048576
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable wireproxy
-systemctl restart wireproxy
+    systemctl daemon-reload
 
-echo ""
-echo "===== 安装完成 ====="
-echo "SOCKS5 地址:"
-echo "IP: 127.0.0.1"
-echo "PORT: $SOCKS_PORT"
-echo ""
-echo "测试Warp是否连接上:"
-echo "curl --socks5-hostname 127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep warp"
-echo "测试Warp的IP:"
-echo "curl --socks5-hostname 127.0.0.1:40000 ip.sb"
-echo "更换Warp的接入IP:"
-echo "systemctl restart wireproxy"
+    systemctl enable ${SERVICE_NAME}
 
+    systemctl restart ${SERVICE_NAME}
+
+    open_firewall
+
+    sleep 3
+
+    SERVER_IP=$(curl -s4 ip.sb || curl -s4 ifconfig.me || echo "YOUR_SERVER_IP")
+
+    echo ""
+    green "===== 安装完成 ====="
+    echo ""
+	systemctl --no-pager status ${SERVICE_NAME} || true
+	echo ""
+    echo "SOCKS5 信息:"
+    echo "地址: ${SERVER_IP}"
+    echo "端口: ${SOCKS_PORT}"
+    echo "用户名: ${SOCKS_USER}"
+    echo "密码: ${SOCKS_PASS}"
+
+    echo ""
+
+    echo "连接格式:"
+    echo "${SERVER_IP}:${SOCKS_PORT}:${SOCKS_USER}:${SOCKS_PASS}"
+
+    echo ""
+
+    echo "测试命令一:"
+    echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' ip.sb"
+
+    echo ""
+	echo "测试命令二:"
+    echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' https://www.cloudflare.com/cdn-cgi/trace | grep warp"
+	
+	echo ""
+    echo "更换WARP接口IP:"
+	echo "systemctl restart ${SERVICE_NAME}"
+}
+
+uninstall_warp() {
+
+    clear
+
+    yellow "===== 卸载 WARP + wireproxy ====="
+    echo ""
+
+    read -p "确认卸载？[y/n]: " CONFIRM
+
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        red "已取消"
+        exit 0
+    fi
+
+    SOCKS_PORT=$(grep BindAddress ${WORKDIR}/wgcf-profile.conf 2>/dev/null | awk -F ':' '{print $2}')
+
+    systemctl stop ${SERVICE_NAME} 2>/dev/null || true
+    systemctl disable ${SERVICE_NAME} 2>/dev/null || true
+
+    rm -f /etc/systemd/system/${SERVICE_NAME}.service
+
+    systemctl daemon-reload
+
+    close_firewall
+
+    rm -rf ${WORKDIR}
+
+    rm -f /usr/local/bin/wireproxy
+
+    green "卸载完成"
+}
+
+show_menu() {
+
+    clear
+
+    green "================================="
+    green " WARP + wireproxy 管理脚本"
+    green "================================="
+    echo ""
+    echo "1. 安装 WARP SOCKS5"
+    echo "2. 卸载 WARP SOCKS5"
+    echo "0. 退出"
+    echo ""
+}
+
+main() {
+
+    check_root
+
+    detect_os
+
+    show_menu
+
+    read -p "请输入选项: " CHOICE
+
+    case "$CHOICE" in
+        1)
+            install_warp
+            ;;
+        2)
+            uninstall_warp
+            ;;
+        0)
+            exit 0
+            ;;
+        *)
+            red "无效选项"
+            exit 1
+            ;;
+    esac
+}
+
+main
