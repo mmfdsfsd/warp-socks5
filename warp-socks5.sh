@@ -259,11 +259,61 @@ EOF
     --proxy-user "${SOCKS_USER}:${SOCKS_PASS}" \
     https://www.cloudflare.com/cdn-cgi/trace | grep warp= || true)
 
-    if echo "${WARP_STATUS}" | grep -q "warp=on"; then
-        green "WARP 运行正常"
+   if echo "${WARP_STATUS}" | grep -q "warp=on"; then
+
+    green "WARP 运行正常"
+
+    echo ""
+
+    green "===== WARP 出口信息 ====="
+
+    WARP_IPV4=$(curl -s4 \
+    --connect-timeout 15 \
+    --socks5-hostname 127.0.0.1:${SOCKS_PORT} \
+    --proxy-user "${SOCKS_USER}:${SOCKS_PASS}" \
+    ipv4.ip.sb || true)
+
+    WARP_IPV6=$(curl -s6 \
+    --connect-timeout 15 \
+    --socks5-hostname 127.0.0.1:${SOCKS_PORT} \
+    --proxy-user "${SOCKS_USER}:${SOCKS_PASS}" \
+    ipv6.ip.sb || true)
+
+    echo "WARP IPv4: ${WARP_IPV4:-获取失败}"
+
+    if [[ -n "$WARP_IPV6" ]]; then
+        echo "WARP IPv6: ${WARP_IPV6}"
     else
-        red "WARP 检测失败"
+        yellow "WARP IPv6: 当前不可用"
     fi
+
+    echo ""
+
+    green "===== WARP 网络状态 ====="
+
+    if [[ -n "$WARP_IPV4" && -n "$WARP_IPV6" ]]; then
+
+        green "双栈模式: IPv4 + IPv6"
+
+    elif [[ -n "$WARP_IPV4" ]]; then
+
+        yellow "单栈模式: 仅 IPv4"
+
+    elif [[ -n "$WARP_IPV6" ]]; then
+
+        yellow "单栈模式: 仅 IPv6"
+
+    else
+
+        red "WARP 网络异常"
+
+    fi
+
+else
+
+    red "WARP 检测失败"
+
+fi
 
     echo ""
 
