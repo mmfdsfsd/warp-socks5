@@ -103,13 +103,22 @@ close_firewall() {
     fi
 }
 
+check_port() {
+
+    if ss -lnt | grep -q ":${SOCKS_PORT} "; then
+        red "端口 ${SOCKS_PORT} 已被占用"
+        exit 1
+    fi
+}
+
 install_warp() {
 
     clear
-	
-	SERVER_IP=$(curl -s4 ip.sb || curl -s4 ifconfig.me || echo "YOUR_SERVER_IP")
-	
+
+    SERVER_IP=$(curl -s4 ip.sb || curl -s4 ifconfig.me || echo "YOUR_SERVER_IP")
+
     green "===== 安装 WARP + wireproxy ====="
+
     echo ""
 
     read -p "请输入 SOCKS5 端口 [默认:40000]: " SOCKS_PORT
@@ -117,20 +126,22 @@ install_warp() {
 
     echo ""
 
-    read -p "请输入 SOCKS5 用户名 [默认:admin]: " SOCKS_USER
+    read -p "请输入 SOCKS5 用户名 [默认:${SERVER_IP}]: " SOCKS_USER
     SOCKS_USER=${SOCKS_USER:-${SERVER_IP}}
 
     echo ""
 
-    read -p "请输入 SOCKS5 密码 [默认:123456]: " SOCKS_PASS
-    SOCKS_PASS=${SOCKS_PASS:-${SERVER_IP}}
+    RANDOM_PASS=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 12)
+
+    read -p "请输入 SOCKS5 密码 [默认:${RANDOM_PASS}]: " SOCKS_PASS
+    SOCKS_PASS=${SOCKS_PASS:-${RANDOM_PASS}}
 
     echo ""
 
     green "配置如下:"
-    echo "端口: $SOCKS_PORT"
-    echo "用户名: $SOCKS_USER"
-    echo "密码: $SOCKS_PASS"
+    echo "端口: ${SOCKS_PORT}"
+    echo "用户名: ${SOCKS_USER}"
+    echo "密码: ${SOCKS_PASS}"
 
     echo ""
 
@@ -141,9 +152,11 @@ install_warp() {
         exit 0
     fi
 
-    mkdir -p $WORKDIR
+    check_port
 
-    cd $WORKDIR
+    mkdir -p ${WORKDIR}
+
+    cd ${WORKDIR}
 
     install_deps
 
@@ -158,14 +171,18 @@ install_warp() {
 
     yes | ./wgcf register
 
-    green "生成配置..."
+    green "生成 WARP 配置..."
 
     ./wgcf generate
+
+    green "优化 WARP 配置..."
+
+    sed -i '/\[Interface\]/a MTU = 1280' wgcf-profile.conf
 
     green "下载 wireproxy..."
 
     wget -O wireproxy.tar.gz \
-    https://github.com/windtf/wireproxy/releases/download/v1.1.2/wireproxy_linux_amd64.tar.gz
+    https://github.com/pufferffish/wireproxy/releases/download/v1.0.9/wireproxy_linux_amd64.tar.gz
 
     tar -zxvf wireproxy.tar.gz
 
@@ -201,7 +218,9 @@ Restart=always
 RestartSec=5
 
 Environment=GOGC=30
+
 MemoryLimit=300M
+
 LimitNOFILE=1048576
 
 [Install]
@@ -216,13 +235,42 @@ EOF
 
     open_firewall
 
-    sleep 3
+    sleep 5
 
     echo ""
-    green "===== 安装完成 ====="
+
+    green "===== 服务状态 ====="
+
+    systemctl --no-pager status ${SERVICE_NAME} || true
+
     echo ""
-	systemctl --no-pager status ${SERVICE_NAME} || true
-	echo ""
+
+    green "===== 端口监听 ====="
+
+    ss -lntp | grep ${SOCKS_PORT} || true
+
+    echo ""
+
+    green "===== WARP 状态检测 ====="
+
+    WARP_STATUS=$(curl -s \
+    --connect-timeout 15 \
+    --socks5-hostname 127.0.0.1:${SOCKS_PORT} \
+    --proxy-user "${SOCKS_USER}:${SOCKS_PASS}" \
+    https://www.cloudflare.com/cdn-cgi/trace | grep warp= || true)
+
+    if echo "${WARP_STATUS}" | grep -q "warp=on"; then
+        green "WARP 运行正常"
+    else
+        red "WARP 检测失败"
+    fi
+
+    echo ""
+
+    green "===== 安装完成 ====="
+
+    echo ""
+
     echo "SOCKS5 信息:"
     echo "地址: ${SERVER_IP}"
     echo "端口: ${SOCKS_PORT}"
@@ -236,16 +284,30 @@ EOF
 
     echo ""
 
-    echo "测试命令一:"
+    echo "测试 IP:"
     echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' ip.sb"
 
     echo ""
-	echo "测试命令二:"
+
+    echo "测试 WARP:"
     echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' https://www.cloudflare.com/cdn-cgi/trace | grep warp"
-	
-	echo ""
-    echo "更换WARP接口IP:"
-	echo "systemctl restart ${SERVICE_NAME}"
+
+    echo ""
+
+    echo "测试 IPv6:"
+    echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' ipv6.ip.sb"
+
+    echo ""
+
+    echo "更换 WARP 出口 IP:"
+    echo "systemctl restart ${SERVICE_NAME}"
+
+    echo ""
+
+    echo "查看实时日志:"
+    echo "journalctl -u ${SERVICE_NAME} -f"
+
+    echo ""
 }
 
 uninstall_warp() {
@@ -253,6 +315,7 @@ uninstall_warp() {
     clear
 
     yellow "===== 卸载 WARP + wireproxy ====="
+
     echo ""
 
     read -p "确认卸载？[y/n]: " CONFIRM
@@ -265,6 +328,7 @@ uninstall_warp() {
     SOCKS_PORT=$(grep BindAddress ${WORKDIR}/wgcf-profile.conf 2>/dev/null | awk -F ':' '{print $2}')
 
     systemctl stop ${SERVICE_NAME} 2>/dev/null || true
+
     systemctl disable ${SERVICE_NAME} 2>/dev/null || true
 
     rm -f /etc/systemd/system/${SERVICE_NAME}.service
@@ -287,10 +351,13 @@ show_menu() {
     green "================================="
     green " WARP + wireproxy 管理脚本"
     green "================================="
+
     echo ""
+
     echo "1. 安装 WARP SOCKS5"
     echo "2. 卸载 WARP SOCKS5"
     echo "0. 退出"
+
     echo ""
 }
 
