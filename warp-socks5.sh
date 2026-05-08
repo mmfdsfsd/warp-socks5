@@ -106,7 +106,9 @@ close_firewall() {
 install_warp() {
 
     clear
-
+	
+	SERVER_IP=$(curl -s4 ip.sb || curl -s4 ifconfig.me || echo "YOUR_SERVER_IP")
+	
     green "===== 安装 WARP + wireproxy ====="
     echo ""
 
@@ -116,12 +118,12 @@ install_warp() {
     echo ""
 
     read -p "请输入 SOCKS5 用户名 [默认:admin]: " SOCKS_USER
-    SOCKS_USER=${SOCKS_USER:-admin}
+    SOCKS_USER=${SOCKS_USER:-${SERVER_IP}}
 
     echo ""
 
     read -p "请输入 SOCKS5 密码 [默认:123456]: " SOCKS_PASS
-    SOCKS_PASS=${SOCKS_PASS:-123456}
+    SOCKS_PASS=${SOCKS_PASS:-${SERVER_IP}}
 
     echo ""
 
@@ -215,8 +217,6 @@ EOF
     open_firewall
 
     sleep 3
-
-    SERVER_IP=$(curl -s4 ip.sb || curl -s4 ifconfig.me || echo "YOUR_SERVER_IP")
 
     echo ""
     green "===== 安装完成 ====="
