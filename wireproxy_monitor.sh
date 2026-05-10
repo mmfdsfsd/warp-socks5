@@ -98,7 +98,7 @@ if [[ "$SUCCESS" == "1" ]]; then
     green "===== WARP连接正常 ====="
 
     echo ""
-    green "===== IPv4 ====="
+    green "===== WARP-IPv4 ====="
     curl -4 -s \
         --connect-timeout 3 \
         --max-time 5 \
@@ -108,7 +108,7 @@ if [[ "$SUCCESS" == "1" ]]; then
 
     echo ""
 
-    green "===== IPv6 ====="
+    green "===== WARP-IPv6 ====="
     curl -6 -s \
         --connect-timeout 3 \
         --max-time 5 \
