@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # =========================================
 # wireproxy socks5 自动检测 + 自动重启
 # 直接读取 wgcf-profile.conf
@@ -32,11 +32,34 @@ if [[ ! -f "$WGCF_CONF" ]]; then
 fi
 
 # =========================================
+    # 自动添加 cron
+    # =========================================
+
+    CRON_CMD="* * * * * /bin/bash /root/wireproxy_monitor.sh >/dev/null 2>&1"
+
+    if ! crontab -l 2>/dev/null | grep -Fq "/root/wireproxy_monitor.sh"; then
+
+        (
+            crontab -l 2>/dev/null
+            echo "${CRON_CMD}"
+        ) | crontab -
+
+        green "已自动添加 cron 定时检测"
+        echo ""
+        echo "${CRON_CMD}"
+        echo ""
+    else
+        yellow "cron 定时任务已存在"
+        echo ""
+    fi
+
+# =========================================
 # 读取 SOCKS5 配置
 # =========================================
 # 使用 awk 提取冒号后的端口号，确保只匹配 [Socks5] 下方的 BindAddress
 SOCKS_PORT=$(grep -A 5 "\[Socks5\]" "$WGCF_CONF" | grep "BindAddress" | awk -F':' '{print $2}' | xargs)
 SOCKS_ADDR="127.0.0.1:${SOCKS_PORT}"
+
 
 # 提取账号密码
 SOCKS_USERNAME=$(grep "Username" "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
@@ -51,8 +74,8 @@ SUCCESS=0
 for SITE in "${SITES[@]}"; do
 
     HTTP_CODE=$(curl -s \
-        --connect-timeout 10 \
-        --max-time 15 \
+        --connect-timeout 3 \
+        --max-time 5 \
         --socks5-hostname ${SOCKS_ADDR} \
         --proxy-user "${SOCKS_USER}" \
         -o /dev/null \
@@ -77,8 +100,8 @@ if [[ "$SUCCESS" == "1" ]]; then
     echo ""
     green "===== IPv4 ====="
     curl -4 -s \
-        --connect-timeout 5 \
-        --max-time 10 \
+        --connect-timeout 3 \
+        --max-time 5 \
         --socks5-hostname ${SOCKS_ADDR} \
         --proxy-user "${SOCKS_USER}" \
         https://ipv4.ip.sb
@@ -87,8 +110,8 @@ if [[ "$SUCCESS" == "1" ]]; then
 
     green "===== IPv6 ====="
     curl -6 -s \
-        --connect-timeout 5 \
-        --max-time 10 \
+        --connect-timeout 3 \
+        --max-time 5 \
         --socks5-hostname ${SOCKS_ADDR} \
         --proxy-user "${SOCKS_USER}" \
         https://ipv6.ip.sb 2>/dev/null
@@ -104,7 +127,7 @@ fi
 FAIL_COUNT=$(cat ${FAIL_FILE} 2>/dev/null || echo 0)
 FAIL_COUNT=$((FAIL_COUNT + 1))
 
-echo "$(date '+%F %T') WARP检测失败，第 ${FAIL_COUNT} 次"
+red "$(date '+%F %T') WARP检测失败，第 ${FAIL_COUNT} 次"
 echo ${FAIL_COUNT} > ${FAIL_FILE}
 
 # =========================================
@@ -112,13 +135,13 @@ echo ${FAIL_COUNT} > ${FAIL_FILE}
 # =========================================
 if [[ "$FAIL_COUNT" -ge "$MAX_FAIL" ]]; then
 
-    echo "$(date '+%F %T') 连续失败，重启 wireproxy"
+    red "$(date '+%F %T') 连续失败，重启 wireproxy"
 
     systemctl restart wireproxy
 
     sleep 5
 
-    echo "$(date '+%F %T') wireproxy 重启完成"
+    green "$(date '+%F %T') wireproxy 重启完成"
 
     echo 0 > ${FAIL_FILE}
 fi
