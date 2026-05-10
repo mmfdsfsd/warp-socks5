@@ -34,12 +34,13 @@ fi
 # =========================================
 # 读取 SOCKS5 配置
 # =========================================
-SOCKS_PORT=$(grep '^BindAddress' "$WGCF_CONF" | awk -F':' '{print $2}' | xargs)
+# 使用 awk 提取冒号后的端口号，确保只匹配 [Socks5] 下方的 BindAddress
+SOCKS_PORT=$(grep -A 5 "\[Socks5\]" "$WGCF_CONF" | grep "BindAddress" | awk -F':' '{print $2}' | xargs)
 SOCKS_ADDR="127.0.0.1:${SOCKS_PORT}"
 
-SOCKS_USERNAME=$(grep '^Username' "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
-SOCKS_PASSWORD=$(grep '^Password' "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
-
+# 提取账号密码
+SOCKS_USERNAME=$(grep "Username" "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
+SOCKS_PASSWORD=$(grep "Password" "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
 SOCKS_USER="${SOCKS_USERNAME}:${SOCKS_PASSWORD}"
 
 # =========================================
