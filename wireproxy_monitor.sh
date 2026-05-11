@@ -35,9 +35,9 @@ fi
     # 自动添加 cron
     # =========================================
 
-    CRON_CMD="* * * * * /bin/bash /root/wireproxy_monitor.sh >/dev/null 2>&1"
+    CRON_CMD="* * * * * /bin/bash /opt/warp/wireproxy_monitor.sh >/dev/null 2>&1"
 
-    if ! crontab -l 2>/dev/null | grep -Fq "/root/wireproxy_monitor.sh"; then
+    if ! crontab -l 2>/dev/null | grep -Fq "/opt/warp/wireproxy_monitor.sh"; then
 
         (
             crontab -l 2>/dev/null
