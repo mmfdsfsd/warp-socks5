@@ -14,7 +14,7 @@ yellow() { echo -e "\033[33m$1\033[0m"; }
 
 WORKDIR="/opt/warp"
 WGCF_CONF="${WORKDIR}/wgcf-profile.conf"
-FAIL_FILE="/tmp/wireproxy_fail_count"
+FAIL_FILE="/opt/warp/wireproxy_fail_count"
 MAX_FAIL=3
 
 SITES=(
