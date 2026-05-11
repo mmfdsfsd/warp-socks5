@@ -14,8 +14,6 @@ yellow() { echo -e "\033[33m$1\033[0m"; }
 
 WORKDIR="/opt/warp"
 WGCF_CONF="${WORKDIR}/wgcf-profile.conf"
-FAIL_FILE="/opt/warp/wireproxy_fail_count"
-MAX_FAIL=3
 
 SITES=(
     "https://ip.sb"
@@ -117,31 +115,17 @@ if [[ "$SUCCESS" == "1" ]]; then
         https://ipv6.ip.sb 2>/dev/null
 
     echo ""
-    echo 0 > ${FAIL_FILE}
     exit 0
 fi
 
 # =========================================
-# 失败计数
+# 检测失败立即重启
 # =========================================
-FAIL_COUNT=$(cat ${FAIL_FILE} 2>/dev/null || echo 0)
-FAIL_COUNT=$((FAIL_COUNT + 1))
 
-red "$(date '+%F %T') WARP检测失败，第 ${FAIL_COUNT} 次"
-echo ${FAIL_COUNT} > ${FAIL_FILE}
+red "$(date '+%F %T') WARP检测失败，正在重启 wireproxy"
 
-# =========================================
-# 自动重启
-# =========================================
-if [[ "$FAIL_COUNT" -ge "$MAX_FAIL" ]]; then
+systemctl restart wireproxy
 
-    red "$(date '+%F %T') 连续失败，重启 wireproxy"
+sleep 5
 
-    systemctl restart wireproxy
-
-    sleep 5
-
-    green "$(date '+%F %T') wireproxy 重启完成"
-
-    echo 0 > ${FAIL_FILE}
-fi
+green "$(date '+%F %T') wireproxy 重启完成"
