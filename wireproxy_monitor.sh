@@ -102,9 +102,7 @@ if [[ "$SUCCESS" == "1" ]]; then
         --max-time 5 \
         --socks5-hostname ${SOCKS_ADDR} \
         --proxy-user "${SOCKS_USER}" \
-        https://ipv4.ip.sb
-
-    echo ""
+        https://ipv4.ip.sb 
 
     green "===== WARP-IPv6 ====="
     curl -6 -s \
@@ -113,8 +111,9 @@ if [[ "$SUCCESS" == "1" ]]; then
         --socks5-hostname ${SOCKS_ADDR} \
         --proxy-user "${SOCKS_USER}" \
         https://ipv6.ip.sb 2>/dev/null
-
-    echo ""
+		
+	echo ""
+    green "WARP检测正常，立即结束并退出当前脚本，返回状态码 0"
     exit 0
 fi
 
