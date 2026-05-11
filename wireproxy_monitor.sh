@@ -60,8 +60,8 @@ SOCKS_ADDR="127.0.0.1:${SOCKS_PORT}"
 
 
 # 提取账号密码
-SOCKS_USERNAME=$(grep "Username" "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
-SOCKS_PASSWORD=$(grep "Password" "$WGCF_CONF" | awk -F'=' '{print $2}' | xargs)
+SOCKS_USERNAME=$(grep -A 5 "\[Socks5\]" "$WGCF_CONF" | grep "^Username" | awk -F'=' '{print $2}' | xargs)
+SOCKS_PASSWORD=$(grep -A 5 "\[Socks5\]" "$WGCF_CONF" | grep "^Password" | awk -F'=' '{print $2}' | xargs)
 SOCKS_USER="${SOCKS_USERNAME}:${SOCKS_PASSWORD}"
 
 # =========================================
@@ -128,3 +128,19 @@ systemctl restart wireproxy
 sleep 5
 
 green "$(date '+%F %T') wireproxy 重启完成"
+	echo ""
+    green "===== WARP-IPv4 ====="
+    curl -4 -s \
+        --connect-timeout 3 \
+        --max-time 5 \
+        --socks5-hostname ${SOCKS_ADDR} \
+        --proxy-user "${SOCKS_USER}" \
+        https://ipv4.ip.sb 
+
+    green "===== WARP-IPv6 ====="
+    curl -6 -s \
+        --connect-timeout 3 \
+        --max-time 5 \
+        --socks5-hostname ${SOCKS_ADDR} \
+        --proxy-user "${SOCKS_USER}" \
+        https://ipv6.ip.sb 2>/dev/null
