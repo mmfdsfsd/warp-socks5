@@ -175,10 +175,6 @@ install_warp() {
 
     ./wgcf generate
 
-    green "优化 WARP 配置..."
-
-    sed -i '/\[Interface\]/a MTU = 1280' wgcf-profile.conf
-
     green "下载 wireproxy..."
 
     wget -O wireproxy.tar.gz \
