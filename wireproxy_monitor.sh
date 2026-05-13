@@ -124,8 +124,8 @@ fi
 red "$(date '+%F %T') WARP检测失败，正在重启 wireproxy"
 
 systemctl restart wireproxy
-
 sleep 5
+systemctl status wireproxy
 
 green "$(date '+%F %T') wireproxy 重启完成"
 	echo ""
