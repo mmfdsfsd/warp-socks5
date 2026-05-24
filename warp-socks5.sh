@@ -330,8 +330,8 @@ fi
 
     echo ""
 
-    echo "测试 IP:"
-    echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' ip.sb"
+    echo "测试 IPv4:"
+    echo "curl --socks5-hostname 127.0.0.1:${SOCKS_PORT} --proxy-user '${SOCKS_USER}:${SOCKS_PASS}' ipv4.ip.sb"
 
     echo ""
 
