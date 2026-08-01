@@ -203,7 +203,7 @@ if [ "$SYSTEMD_VER" -lt 247 ]; then
     MEMORY_CONFIG="MemoryLimit=300M"
 else
     # Debian 11/12/13
-    MEMORY_CONFIG=$'MemoryHigh=250M\nMemoryMax=300M\nMemorySwapMax=0'
+    MEMORY_CONFIG=$'MemoryHigh=350M\nMemoryMax=400M\nMemorySwapMax=0'
 fi
 
     cat > /etc/systemd/system/${SERVICE_NAME}.service <<EOF
