@@ -197,6 +197,14 @@ Password = ${SOCKS_PASS}
 EOF
 
     green "创建 systemd 服务..."
+SYSTEMD_VER=$(systemctl --version | awk 'NR==1{print $2}')
+if [ "$SYSTEMD_VER" -lt 247 ]; then
+    # Debian 9 10 等旧版本
+    MEMORY_CONFIG="MemoryLimit=300M"
+else
+    # Debian 11/12/13
+    MEMORY_CONFIG=$'MemoryHigh=250M\nMemoryMax=300M\nMemorySwapMax=0'
+fi
 
     cat > /etc/systemd/system/${SERVICE_NAME}.service <<EOF
 [Unit]
@@ -215,7 +223,7 @@ RestartSec=5
 
 Environment=GOGC=30
 
-MemoryLimit=300M
+${MEMORY_CONFIG}
 
 LimitNOFILE=1048576
 
